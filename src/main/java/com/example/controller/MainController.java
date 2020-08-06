@@ -2,91 +2,56 @@ package com.example.controller;
 
 import com.example.model.User;
 import com.example.service.UserService;
-import java.util.Collections;
-import org.springframework.beans.factory.annotation.Autowired;
+import java.util.Set;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.ui.ModelMap;
-import org.springframework.validation.BindingResult;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 @Controller
+@RequestMapping("/admin")
 public class MainController {
 
-    @Autowired
-    UserService userService;
 
-    @GetMapping("login")
-    public String login() {
-        return "login";
-    }
+  private final UserService userService;
 
-    @GetMapping("user")
-    public String user(ModelMap modelMap, Authentication auth) {
-        if (auth.isAuthenticated()) {
-            String userName = auth.getName();
-            User user = userService.getUserByName(userName);
-            modelMap.addAttribute("user", user);
-        }
-        return "user"; 
-    }
+  public MainController(UserService userService) {
+    this.userService = userService;
+  }
 
-    @GetMapping("admin")
-    public String showUsersTable(ModelMap model) {
-        model.addAttribute("users", userService.getAllUsers());
-        return "index.html";
-    }
+  @GetMapping
+  public String showUsersTable(ModelMap model, Authentication authentication) {
+    model.addAttribute("user", authentication.getPrincipal());
+    model.addAttribute("users", userService.getAllUsers());
+    model.addAttribute("roles", userService.getAllRoles());
+    return "index";
+  }
 
-    @GetMapping("signup")
-    public String showSignUpForm(User user, ModelMap model) {
-        return "add-user";
-    }
+  @PostMapping("/adduser")
+  public String addUser(@RequestParam(value = "role_id", required = false) Set<Long> roleId,
+      @Validated User user) {
+    user.setRoles(userService.findByRole(roleId));
+    userService.addUser(user);
+    return "redirect:/admin";
+  }
 
-    @PostMapping("adduser")
-    public String addUser(@RequestParam(value = "role_id") Long roleId,
-                          @Validated User user, BindingResult result,
-                          ModelMap model) {
-        if (result.hasErrors()) {
-            return "add-user";
-        }
-        user.setRoles(Collections.singleton(userService.findByRole(roleId)));
-        userService.addUser(user);
-        model.addAttribute("users", userService.getAllUsers());
-        return "index";
-    }
+  @PostMapping("/update/{id}")
+  public String updateUser(@RequestParam(value = "role_id") Set<Long> roleId,
+      @Validated User user) {
 
+    user.setRoles(userService.findByRole(roleId));
+    userService.updateUser(user);
+    return "redirect:/admin";
+  }
 
-    @GetMapping("edit/{id}")
-    public String showUpdateForm(@PathVariable("id") long id, Model model) {
-        User user = userService.findById(id);
-        model.addAttribute("user", user);
-        return "update-user";
-    }
-
-    @PostMapping("update/{id}")
-    public String updateUser(@RequestParam(value = "role_id") Long roleId,
-                             @PathVariable("id") long id, @Validated User user,
-                             BindingResult result, Model model) {
-        if (result.hasErrors()) {
-            user.setId(id);
-            return "update-user";
-        }
-        user.setRoles(Collections.singleton(userService.findByRole(roleId)));
-        userService.updateUser(user);
-        model.addAttribute("users", userService.getAllUsers());
-        return "index";
-    }
-
-    @GetMapping("delete/{id}")
-    public String deleteUser(@PathVariable("id") long id, Model model) {
-        User user = userService.findById(id);
-        userService.deleteUser(user);
-        model.addAttribute("users", userService.getAllUsers());
-        return "index";
-    }
+  @PostMapping("/delete")
+  public String deleteUser(@RequestParam("id") long id) {
+    User user = userService.findById(id);
+    userService.deleteUser(user);
+    return "redirect:/admin";
+  }
 }
